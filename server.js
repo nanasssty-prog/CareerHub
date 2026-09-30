@@ -1,6 +1,6 @@
 const express = require("express");
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const resumesRouter = require("./routes/resumes");
 const vacanciesRouter = require("./routes/vacancies");
@@ -20,4 +20,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => console.log("Сервер запущен на http://localhost:3000"));
+app.listen(PORT, () =>
+  console.log("Сервер запущен на http://localhost:${PORT}"),
+);

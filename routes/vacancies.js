@@ -1,73 +1,21 @@
 const express = require("express");
 const router = express.Router();
 
-let vacancies = [
-  {
-    id: 1,
-    title: "Backend Developer",
-    companyName: "БеларусБанк",
-    description: "",
-    location: "Минск, Беларусь",
-    employmentType: "Полная занятость",
-    workplaceType: "В офисе",
-    experienceLevel: "Senior",
-    skillsRequired: ["TypeScript", "Docker", "REST API"],
-    salary: { from: 3000, to: 4500, currency: "РБ" },
-    status: "Активна",
-  },
-  {
-    id: 2,
-    title: "Frontend Developer",
-    companyName: "БелинвестБанк",
-    description: "",
-    location: "Орша, Беларусь",
-    employmentType: "Контракт",
-    workplaceType: "Удаленно",
-    experienceLevel: "Middle",
-    skillsRequired: ["Figma", "JavaScript"],
-    salary: { from: 2000, to: 2500, currency: "РБ" },
-    status: "Активна",
-  },
-  {
-    id: 3,
-    title: "1С Программист",
-    companyName: "ГБСофт",
-    description: "",
-    location: "Минск, Беларусь",
-    employmentType: "Стажировка",
-    workplaceType: "Частичная занятость",
-    experienceLevel: "Intern",
-    skillsRequired: ["1С"],
-    salary: { from: 500, to: 600, currency: "USD" },
-    status: "Активна",
-  },
-  {
-    id: 4,
-    title: "Backend Developer",
-    companyName: "Инновайз",
-    description: "",
-    location: "Минск, Беларусь",
-    employmentType: "Частичная занятость",
-    workplaceType: "Гибрид",
-    experienceLevel: "Junior",
-    skillsRequired: ["TypeScript", "Docker", "REST API"],
-    salary: { from: 3000, to: 4500, currency: "USD" },
-    status: "Активна",
-  },
-];
+const { Vacancy } = require("../models");
 
-router.get("/", (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
+    const vacancies = await Vacancy.findAll();
     res.json(vacancies);
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/:id", (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    const vacancy = vacancies.find((r) => r.id === id);
+    const id = req.params.id;
+    const vacancy = await Vacancy.findByPk(id);
 
     if (!vacancy) {
       return res.status(404).json({ error: `Вакансия с ID ${id} не найдена` });
@@ -79,9 +27,20 @@ router.get("/:id", (req, res, next) => {
   }
 });
 
-router.post("/", (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
-    const { title, companyName, skillsRequired } = req.body || {};
+    const {
+      title,
+      companyName,
+      description,
+      location,
+      employmentType,
+      workplaceType,
+      experienceLevel,
+      skillsRequired,
+      salary,
+      status,
+    } = req.body || {};
 
     if (!title || !companyName) {
       return res.status(400).json({
@@ -89,33 +48,40 @@ router.post("/", (req, res, next) => {
       });
     }
 
-    const newvacancy = {
-      id:
-        vacancies.length > 0 ? Math.max(...vacancies.map((r) => r.id)) + 1 : 1, // Генерация ID
+    const newVacancy = await Vacancy.create({
       title,
       companyName,
+      description: description || "",
+      location: location || "",
+      employmentType: employmentType || "",
+      workplaceType: workplaceType || "",
+      experienceLevel: experienceLevel || "",
       skillsRequired: skillsRequired || [],
-    };
+      salary: salary || {},
+      status: status || "Активна",
+    });
 
-    vacancies.push(newvacancy);
-    res.status(201).json(newvacancy);
+    res.status(201).json(newVacancy);
   } catch (err) {
     next(err);
   }
 });
 
-router.put("/:id", (req, res, next) => {
+router.put("/:id", async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    const { title, companyName, skillsRequired } = req.body || {};
-
-    const vacancyIndex = vacancies.findIndex((r) => r.id === id);
-
-    if (vacancyIndex === -1) {
-      return res
-        .status(404)
-        .json({ error: `Вакансия с ID ${id} не найдена для обновления` });
-    }
+    const id = req.params.id;
+    const {
+      title,
+      companyName,
+      description,
+      location,
+      employmentType,
+      workplaceType,
+      experienceLevel,
+      skillsRequired,
+      salary,
+      status,
+    } = req.body || {};
 
     if (!title || !companyName) {
       return res.status(400).json({
@@ -123,31 +89,45 @@ router.put("/:id", (req, res, next) => {
       });
     }
 
-    vacancies[vacancyIndex] = {
-      id,
+    const vacancy = await Vacancy.findByPk(id);
+
+    if (!vacancy) {
+      return res
+        .status(404)
+        .json({ error: `Вакансия с ID ${id} не найдена для обновления` });
+    }
+
+    await vacancy.update({
       title,
       companyName,
+      description: description || "",
+      location: location || "",
+      employmentType: employmentType || "",
+      workplaceType: workplaceType || "",
+      experienceLevel: experienceLevel || "",
       skillsRequired: skillsRequired || [],
-    };
+      salary: salary || {},
+      status: status || "Активна",
+    });
 
-    res.json(vacancies[vacancyIndex]);
+    res.json(vacancy);
   } catch (err) {
     next(err);
   }
 });
 
-router.delete("/:id", (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    const vacancyIndex = vacancies.findIndex((r) => r.id === id);
+    const id = req.params.id;
+    const vacancy = await Vacancy.findByPk(id);
 
-    if (vacancyIndex === -1) {
+    if (!vacancy) {
       return res
         .status(404)
         .json({ error: `Вакансия с ID ${id} не найдена для удаления` });
     }
 
-    vacancies.splice(vacancyIndex, 1);
+    await vacancy.destroy();
 
     res.json({ message: `Вакансия с ID ${id} успешно удалена` });
   } catch (err) {

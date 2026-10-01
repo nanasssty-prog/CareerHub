@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+const authMiddleware = require("../middleware/auth");
+const isAdmin = require("../middleware/isAdmin");
+
 const { Vacancy } = require("../models");
 
 router.get("/", async (req, res, next) => {
@@ -116,7 +119,7 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", authMiddleware, isAdmin, async (req, res, next) => {
   try {
     const id = req.params.id;
     const vacancy = await Vacancy.findByPk(id);

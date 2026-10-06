@@ -1,0 +1,15 @@
+<h1>Список вакансий</h1>
+<a href="/add?auth=1" class="btn btn-success mb-3">Создать вакансию</a>
+
+<% if (vacancies.length === 0) { %>
+    <p>Вакансий пока нет.</p>
+<% } else { %>
+    <ul class="list-group">
+    <% vacancies.forEach(function(vacancy) { %>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <%= vacancy.title %> 
+            <a href="/item/<%= vacancy.id %>" class="btn btn-sm btn-primary">Подробнее</a>
+        </li>
+    <% }); %>
+    </ul>
+<% } %>

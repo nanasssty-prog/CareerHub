@@ -1,0 +1,15 @@
+<h1><%= vacancy.title %></h1>
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">Описание</h5>
+    <p class="card-text"><%= vacancy.description %></p>
+    <p><strong>Зарплата:</strong> 
+      <% if (typeof vacancy.salary === 'object' && vacancy.salary !== null) { %>
+          от <%= vacancy.salary.from %> до <%= vacancy.salary.to %> <%= vacancy.salary.currency %>
+      <% } else { %>
+          <%= vacancy.salary %>
+      <% } %>
+    </p>
+    <a href="/" class="btn btn-secondary">Назад к списку</a>
+  </div>
+</div>

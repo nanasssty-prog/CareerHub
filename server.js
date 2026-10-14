@@ -17,6 +17,13 @@ app.use("/auth", authRoutes);
 app.use("/resumes", resumesRouter);
 app.use("/vacancies", vacanciesRouter);
 
+app.get("/profile", authMiddleware, (req, res) => {
+  res.json({
+    message: "Успешный доступ к защищенному маршруту",
+    user: req.user,
+  });
+});
+
 app.use((err, req, res, next) => {
   console.error("Глобальный перехват ошибки:", err.stack);
 
@@ -24,13 +31,6 @@ app.use((err, req, res, next) => {
     success: false,
     error: "На сервере произошла внутренняя ошибка",
     message: err.message,
-  });
-});
-
-app.get("/profile", authMiddleware, (req, res) => {
-  res.json({
-    message: "Успешный доступ к защищенному маршруту",
-    user: req.user,
   });
 });
 

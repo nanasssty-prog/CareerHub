@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { Op } = require("sequelize");
 
 const authMiddleware = require("../middleware/auth");
 const isAdmin = require("../middleware/isAdmin");
@@ -8,7 +9,21 @@ const { Vacancy } = require("../models");
 
 router.get("/", async (req, res, next) => {
   try {
-    const vacancies = await Vacancy.findAll();
+    const { search } = req.query; // Ловим параметр search из строки запроса
+    let whereClause = {};
+
+    if (search) {
+      // Ищем совпадения в названии, компании или навыках
+      whereClause = {
+        [Op.or]: [
+          { title: { [Op.iLike]: `%${search}%` } },
+          { companyName: { [Op.iLike]: `%${search}%` } },
+          { skillsRequired: { [Op.iLike]: `%${search}%` } },
+        ],
+      };
+    }
+
+    const vacancies = await Vacancy.findAll({ where: whereClause });
     res.json(vacancies);
   } catch (err) {
     next(err);

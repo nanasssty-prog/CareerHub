@@ -1,6 +1,3 @@
-// Универсальный хук для CRUD операций с оптимистичным обновлением UI
-// Хук принимает объект с 4 функциями API (чтение, создание, обновление, удаление)
-
 import { useState, useEffect, useCallback } from "react";
 
 export function useCrud({ fetchItems, addItem, updateItem, deleteItem }) {
@@ -8,19 +5,26 @@ export function useCrud({ fetchItems, addItem, updateItem, deleteItem }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchItems();
-      setItems(response.data);
-    } catch (err) {
-      console.error(err);
-      setError("Не удалось загрузить данные с сервера. Проверьте подключение.");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchItems]);
+  const loadData = useCallback(
+    async (query = "") => {
+      setLoading(true);
+      setError(null);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const response = await fetchItems(query);
+        setItems(response.data);
+      } catch (err) {
+        console.error(err);
+        setError(
+          "Не удалось загрузить данные с сервера. Проверьте подключение.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchItems],
+  );
 
   useEffect(() => {
     loadData();
@@ -30,17 +34,17 @@ export function useCrud({ fetchItems, addItem, updateItem, deleteItem }) {
     const tempId = Date.now();
     const optimisticItem = { id: tempId, ...newItemData };
 
-    setItems((prev) => [optimisticItem, ...prev]); // Мгновенно показываем в UI
+    setItems((prev) => [optimisticItem, ...prev]);
 
     try {
-      const response = await addItem(newItemData); // Отправляем на сервер
+      const response = await addItem(newItemData);
       const realItem = response.data;
       setItems((prev) =>
         prev.map((item) => (item.id === tempId ? realItem : item)),
-      ); // Меняем ID
-      return true; // Возвращаем успех для очистки формы в компоненте
+      );
+      return true;
     } catch (err) {
-      setItems((prev) => prev.filter((item) => item.id !== tempId)); // Откат
+      setItems((prev) => prev.filter((item) => item.id !== tempId));
       alert("Ошибка при добавлении на сервере!");
       return false;
     }
@@ -58,7 +62,7 @@ export function useCrud({ fetchItems, addItem, updateItem, deleteItem }) {
       await updateItem(id, updatedFields);
       return true;
     } catch (err) {
-      setItems(originalItems); // Откат
+      setItems(originalItems);
       alert("Ошибка при сохранении изменений!");
       return false;
     }
@@ -72,12 +76,11 @@ export function useCrud({ fetchItems, addItem, updateItem, deleteItem }) {
       await deleteItem(id);
       return true;
     } catch (err) {
-      setItems(originalItems); // Откат
+      setItems(originalItems);
       alert("Ошибка при удалении!");
       return false;
     }
   };
 
-  // Возвращаем только то, что нужно компоненту для отрисовки интерфейса
   return { items, loading, error, create, update, remove, reload: loadData };
 }

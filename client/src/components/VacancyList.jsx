@@ -8,7 +8,6 @@ import {
 import { useCrud } from "../hooks/useCrud";
 
 export default function VacancyList() {
-  // Передаем в универсальный хук методы для вакансий
   const {
     items: vacancies,
     loading,
@@ -75,20 +74,28 @@ export default function VacancyList() {
     setSalaryTo("");
   };
 
-  const filteredVacancies = vacancies.filter(
-    (vacancy) =>
-      vacancy.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vacancy.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.skillsRequired?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      reload(searchQuery);
+    }, 500);
 
-  const sortedAndFilteredVacancies = [...filteredVacancies].sort((a, b) => {
-    const getSortSalary = (v) => v.salaryFrom || 0;
+    return () => clearTimeout(timer);
+  }, [searchQuery, reload]);
+
+  const sortedVacancies = [...vacancies].sort((a, b) => {
+    const getSortSalary = (v) => {
+      const from = Number(v.salaryFrom);
+      if (from > 0) return from;
+      const to = Number(v.salaryTo);
+      if (to > 0) return to;
+      return 0;
+    };
+
     switch (sortType) {
       case "title_asc":
-        return a.title.localeCompare(b.title);
+        return (a.title || "").localeCompare(b.title || "");
       case "title_desc":
-        return b.title.localeCompare(a.title);
+        return (b.title || "").localeCompare(a.title || "");
       case "salary_asc":
         return getSortSalary(a) - getSortSalary(b);
       case "salary_desc":
@@ -98,11 +105,11 @@ export default function VacancyList() {
     }
   });
 
-  const totalCount = sortedAndFilteredVacancies.length;
+  const totalCount = sortedVacancies.length;
   const averageSalary =
     totalCount > 0
       ? Math.round(
-          sortedAndFilteredVacancies.reduce(
+          sortedVacancies.reduce(
             (acc, curr) => acc + (curr.salaryFrom || 0),
             0,
           ) / totalCount,
@@ -169,7 +176,7 @@ export default function VacancyList() {
               <input
                 type="number"
                 className="form-control"
-                placeholder="ЗП от ($)"
+                placeholder="ЗП от (б.р.)"
                 value={salaryFrom}
                 onChange={(e) => setSalaryFrom(e.target.value)}
               />
@@ -178,7 +185,7 @@ export default function VacancyList() {
               <input
                 type="number"
                 className="form-control"
-                placeholder="ЗП до ($)"
+                placeholder="ЗП до (б.р.)"
                 value={salaryTo}
                 onChange={(e) => setSalaryTo(e.target.value)}
               />
@@ -247,7 +254,7 @@ export default function VacancyList() {
       </div>
 
       <ul className="list-group shadow-sm">
-        {sortedAndFilteredVacancies.map((v) => (
+        {sortedVacancies.map((v) => (
           <li
             key={v.id}
             className="list-group-item d-flex justify-content-between align-items-center p-3"

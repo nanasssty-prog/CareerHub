@@ -41,7 +41,8 @@ router.post("/", async (req, res, next) => {
       workplaceType,
       experienceLevel,
       skillsRequired,
-      salary,
+      salaryFrom,
+      salaryTo,
       status,
     } = req.body || {};
 
@@ -59,8 +60,9 @@ router.post("/", async (req, res, next) => {
       employmentType: employmentType || "",
       workplaceType: workplaceType || "",
       experienceLevel: experienceLevel || "",
-      skillsRequired: skillsRequired || [],
-      salary: salary || {},
+      skillsRequired: skillsRequired || "",
+      salaryFrom: salaryFrom ? Number(salaryFrom) : null,
+      salaryTo: salaryTo ? Number(salaryTo) : null,
       status: status || "Активна",
     });
 
@@ -82,7 +84,8 @@ router.put("/:id", async (req, res, next) => {
       workplaceType,
       experienceLevel,
       skillsRequired,
-      salary,
+      salaryFrom,
+      salaryTo,
       status,
     } = req.body || {};
 
@@ -108,8 +111,9 @@ router.put("/:id", async (req, res, next) => {
       employmentType: employmentType || "",
       workplaceType: workplaceType || "",
       experienceLevel: experienceLevel || "",
-      skillsRequired: skillsRequired || [],
-      salary: salary || {},
+      skillsRequired: skillsRequired || "",
+      salaryFrom: salaryFrom ? Number(salaryFrom) : null,
+      salaryTo: salaryTo ? Number(salaryTo) : null,
       status: status || "Активна",
     });
 

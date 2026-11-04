@@ -1,110 +1,139 @@
 import React, { useState } from "react";
-import { useLocalStorage } from "../hooks/useLocalStorage";
-
-const initialVacancies = [
-  {
-    id: 1,
-    title: "Frontend Developer",
-    company: "Belinvestbank",
-    salary: 2100,
-  },
-  { id: 2, title: "Backend Developer", company: "BelarusBank", salary: 2500 },
-  { id: 3, title: "UI/UX Designer", company: "UIAgency", salary: 1600 },
-  { id: 4, title: "Business Analyst", company: "SoftClub", salary: 1700 },
-  { id: 5, title: "Backend Developer", company: "SoftClub", salary: 2200 },
-  { id: 6, title: "Test Engineer", company: "BelarusBank", salary: 1600 },
-];
+import {
+  fetchVacancies,
+  addVacancy,
+  updateVacancy,
+  deleteVacancy,
+} from "../api";
+import { useCrud } from "../hooks/useCrud";
 
 export default function VacancyList() {
-  const [vacancies, setVacancies] = useLocalStorage(
-    "careerhub_vacancies",
-    initialVacancies,
-  );
+  // Передаем в универсальный хук методы для вакансий
+  const {
+    items: vacancies,
+    loading,
+    error,
+    create,
+    update,
+    remove,
+    reload,
+  } = useCrud({
+    fetchItems: fetchVacancies,
+    addItem: addVacancy,
+    updateItem: updateVacancy,
+    deleteItem: deleteVacancy,
+  });
 
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
-  const [salary, setSalary] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [skillsRequired, setSkillsRequired] = useState("");
+  const [salaryFrom, setSalaryFrom] = useState("");
+  const [salaryTo, setSalaryTo] = useState("");
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [sortType, setSortType] = useState("default");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !company.trim() || !salary.trim()) return;
+    if (!title.trim() || !company.trim()) return;
 
-    if (editingId) {
-      setVacancies(
-        vacancies.map((vacancy) =>
-          vacancy.id === editingId
-            ? { ...vacancy, title, company, salary: Number(salary) }
-            : vacancy,
-        ),
-      );
-      setEditingId(null);
-    } else {
-      const newVacancy = {
-        id: Date.now(),
-        title: title,
-        company: company,
-        salary: Number(salary),
-      };
-      setVacancies([newVacancy, ...vacancies]);
-    }
+    const vacancyData = {
+      title,
+      companyName: company,
+      skillsRequired: skillsRequired,
+      salaryFrom: salaryFrom ? Number(salaryFrom) : null,
+      salaryTo: salaryTo ? Number(salaryTo) : null,
+    };
 
-    setTitle("");
-    setCompany("");
-    setSalary("");
+    const success = editingId
+      ? await update(editingId, vacancyData)
+      : await create(vacancyData);
+    if (success) resetForm();
   };
 
   const handleEdit = (vacancy) => {
     setEditingId(vacancy.id);
     setTitle(vacancy.title);
-    setCompany(vacancy.company);
-    setSalary(vacancy.salary);
+    setCompany(vacancy.companyName || "");
+    setSkillsRequired(vacancy.skillsRequired || "");
+    setSalaryFrom(vacancy.salaryFrom || "");
+    setSalaryTo(vacancy.salaryTo || "");
   };
 
-  const handleDelete = (id) => {
-    setVacancies(vacancies.filter((vacancy) => vacancy.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setTitle("");
-      setCompany("");
-      setSalary("");
-    }
+  const handleDelete = async (id) => {
+    await remove(id);
+    if (editingId === id) resetForm();
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setCompany("");
+    setSkillsRequired("");
+    setSalaryFrom("");
+    setSalaryTo("");
   };
 
   const filteredVacancies = vacancies.filter(
     (vacancy) =>
-      vacancy.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vacancy.company.toLowerCase().includes(searchQuery.toLowerCase()),
+      vacancy.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vacancy.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.skillsRequired?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const sortedAndFilteredVacancies = [...filteredVacancies].sort((a, b) => {
+    const getSortSalary = (v) => v.salaryFrom || 0;
     switch (sortType) {
       case "title_asc":
         return a.title.localeCompare(b.title);
       case "title_desc":
         return b.title.localeCompare(a.title);
       case "salary_asc":
-        return a.salary - b.salary;
+        return getSortSalary(a) - getSortSalary(b);
       case "salary_desc":
-        return b.salary - a.salary;
+        return getSortSalary(b) - getSortSalary(a);
       default:
         return 0;
     }
   });
 
   const totalCount = sortedAndFilteredVacancies.length;
-  const sumSalary = sortedAndFilteredVacancies.reduce(
-    (acc, curr) => acc + curr.salary,
-    0,
-  );
-  const averageSalary = totalCount > 0 ? Math.round(sumSalary / totalCount) : 0;
+  const averageSalary =
+    totalCount > 0
+      ? Math.round(
+          sortedAndFilteredVacancies.reduce(
+            (acc, curr) => acc + (curr.salaryFrom || 0),
+            0,
+          ) / totalCount,
+        )
+      : 0;
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center mt-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Загрузка...</span>
+        </div>
+        <span className="ms-3 fs-5">Загрузка вакансий...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-danger mt-5 text-center shadow-sm">
+        <h4>Ошибка!</h4>
+        <p>{error}</p>
+        <button className="btn btn-danger mt-2" onClick={reload}>
+          Повторить
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 pb-5">
-      {/* Форма */}
       <div
         className={`card mb-4 shadow-sm border-0 ${editingId ? "bg-warning-subtle" : "bg-light"}`}
       >
@@ -115,50 +144,68 @@ export default function VacancyList() {
             {editingId ? "Редактирование вакансии" : "Добавить новую вакансию"}
           </h5>
           <form onSubmit={handleSubmit} className="row g-3">
-            <div className="col-md-3">
+            {/* Первая строка формы */}
+            <div className="col-md-4">
               <input
                 type="text"
                 className="form-control"
                 placeholder="Название"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                required
               />
             </div>
-            <div className="col-md-3">
+            <div className="col-md-4">
               <input
                 type="text"
                 className="form-control"
                 placeholder="Компания"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
+                required
               />
             </div>
             <div className="col-md-2">
               <input
                 type="number"
                 className="form-control"
-                placeholder="Зарплата (\$)"
-                value={salary}
-                onChange={(e) => setSalary(e.target.value)}
+                placeholder="ЗП от ($)"
+                value={salaryFrom}
+                onChange={(e) => setSalaryFrom(e.target.value)}
               />
             </div>
-            <div className="col-md-4 d-flex gap-2">
+            <div className="col-md-2">
+              <input
+                type="number"
+                className="form-control"
+                placeholder="ЗП до ($)"
+                value={salaryTo}
+                onChange={(e) => setSalaryTo(e.target.value)}
+              />
+            </div>
+
+            {/* Вторая строка формы: Поле для навыков */}
+            <div className="col-md-10">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Требуемые навыки (например: React, Node.js, Express)"
+                value={skillsRequired}
+                onChange={(e) => setSkillsRequired(e.target.value)}
+              />
+            </div>
+            <div className="col-md-2 d-flex gap-2">
               <button
                 type="submit"
                 className={`btn w-100 fw-bold ${editingId ? "btn-warning" : "btn-primary"}`}
               >
-                {editingId ? "Сохранить" : "+ Добавить"}
+                {editingId ? "Сохранить" : "Добавить"}
               </button>
               {editingId && (
                 <button
                   type="button"
-                  className="btn btn-secondary w-50"
-                  onClick={() => {
-                    setEditingId(null);
-                    setTitle("");
-                    setCompany("");
-                    setSalary("");
-                  }}
+                  className="btn btn-secondary"
+                  onClick={resetForm}
                 >
                   Отмена
                 </button>
@@ -168,7 +215,6 @@ export default function VacancyList() {
         </div>
       </div>
 
-      {/* Поиск и сортировка */}
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
         <h2 className="mb-0">Список вакансий</h2>
         <div className="d-flex gap-2 flex-grow-1" style={{ maxWidth: "600px" }}>
@@ -184,61 +230,59 @@ export default function VacancyList() {
             value={sortType}
             onChange={(e) => setSortType(e.target.value)}
           >
-            <option value="default">Сортировка: По умолчанию</option>
+            <option value="default">Сортировка по умолчанию</option>
             <option value="title_asc">Название (А-Я)</option>
-            <option value="title_desc">Название (Я-А)</option>
-            <option value="salary_asc">Зарплата (по возрастанию)</option>
-            <option value="salary_desc">Зарплата (по убыванию)</option>
+            <option value="salary_desc">Зарплата (убыв.)</option>
           </select>
         </div>
       </div>
 
-      <div className="alert alert-info d-flex justify-content-between align-items-center mb-3 shadow-sm">
+      <div className="alert alert-info d-flex justify-content-between mb-3 shadow-sm">
         <span>
-          <strong>Найдено вакансий:</strong> {totalCount}
+          <strong>Найдено:</strong> {totalCount}
         </span>
         <span>
-          <strong>Средняя зарплата:</strong> {averageSalary} \$
+          <strong>Средняя ЗП (от):</strong> {averageSalary} $
         </span>
       </div>
 
-      {/* Список вакансий */}
-      {sortedAndFilteredVacancies.length === 0 ? (
-        <p className="text-muted text-center mt-5 fs-5">
-          По вашему запросу ничего не найдено.
-        </p>
-      ) : (
-        <ul className="list-group shadow-sm">
-          {sortedAndFilteredVacancies.map((vacancy) => (
-            <li
-              key={vacancy.id}
-              className="list-group-item d-flex justify-content-between align-items-center p-3"
-            >
-              <div>
-                <strong className="fs-5 text-dark">{vacancy.title}</strong>
-                <span className="text-secondary ms-2">({vacancy.company})</span>
+      <ul className="list-group shadow-sm">
+        {sortedAndFilteredVacancies.map((v) => (
+          <li
+            key={v.id}
+            className="list-group-item d-flex justify-content-between align-items-center p-3"
+          >
+            <div>
+              <strong className="fs-5 text-dark">{v.title}</strong>
+              <span className="text-secondary ms-2">
+                ({v.companyName || "Не указана"})
+              </span>
+              {/* Вывод навыков под названием */}
+              <div className="text-muted small mt-1">
+                <strong>Навыки:</strong> {v.skillsRequired || "Не указаны"}
               </div>
-              <div>
-                <span className="badge bg-success rounded-pill px-3 py-2 fs-6 me-3">
-                  {vacancy.salary} \$
-                </span>
-                <button
-                  onClick={() => handleEdit(vacancy)}
-                  className="btn btn-sm btn-outline-warning me-2"
-                >
-                  Редактировать
-                </button>
-                <button
-                  onClick={() => handleDelete(vacancy.id)}
-                  className="btn btn-sm btn-outline-danger"
-                >
-                  Удалить
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
+            <div>
+              <span className="badge bg-success rounded-pill px-3 py-2 fs-6 me-3">
+                {v.salaryFrom ? `${v.salaryFrom}$` : "0$"}{" "}
+                {v.salaryTo ? `- ${v.salaryTo}$` : ""}
+              </span>
+              <button
+                onClick={() => handleEdit(v)}
+                className="btn btn-sm btn-outline-warning me-2"
+              >
+                Ред.
+              </button>
+              <button
+                onClick={() => handleDelete(v.id)}
+                className="btn btn-sm btn-outline-danger"
+              >
+                Удал.
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -1,30 +1,34 @@
 const express = require("express");
 const router = express.Router();
-const { Op } = require("sequelize");
-
 const authMiddleware = require("../middleware/auth");
 const isAdmin = require("../middleware/isAdmin");
 
-const { Vacancy } = require("../models");
+const Vacancy = require("../models/vacancy");
 
 router.get("/", async (req, res, next) => {
   try {
-    const { search } = req.query; // Ловим параметр search из строки запроса
-    let whereClause = {};
+    const { search } = req.query;
+    let query = {};
 
     if (search) {
-      // Ищем совпадения в названии, компании или навыках
-      whereClause = {
-        [Op.or]: [
-          { title: { [Op.iLike]: `%${search}%` } },
-          { companyName: { [Op.iLike]: `%${search}%` } },
-          { skillsRequired: { [Op.iLike]: `%${search}%` } },
+      query = {
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { companyName: { $regex: search, $options: "i" } },
+          { skillsRequired: { $regex: search, $options: "i" } },
         ],
       };
     }
 
-    const vacancies = await Vacancy.findAll({ where: whereClause });
-    res.json(vacancies);
+    const vacancies = await Vacancy.find(query);
+
+    const formattedVacancies = vacancies.map((v) => {
+      const doc = v.toObject();
+      doc.id = doc._id;
+      return doc;
+    });
+
+    res.json(formattedVacancies);
   } catch (err) {
     next(err);
   }
@@ -32,14 +36,12 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const vacancy = await Vacancy.findByPk(id);
+    const vacancy = await Vacancy.findById(req.params.id);
+    if (!vacancy) return res.status(404).json({ error: "Вакансия не найдена" });
 
-    if (!vacancy) {
-      return res.status(404).json({ error: `Вакансия с ID ${id} не найдена` });
-    }
-
-    res.json(vacancy);
+    const doc = vacancy.toObject();
+    doc.id = doc._id;
+    res.json(doc);
   } catch (err) {
     next(err);
   }
@@ -47,41 +49,26 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const {
-      title,
-      companyName,
-      description,
-      location,
-      employmentType,
-      workplaceType,
-      experienceLevel,
-      skillsRequired,
-      salaryFrom,
-      salaryTo,
-      status,
-    } = req.body || {};
-
+    const { title, companyName, salaryFrom, salaryTo, skillsRequired } =
+      req.body || {};
     if (!title || !companyName) {
-      return res.status(400).json({
-        error: "Поля 'title' и 'companyName' обязательны для заполнения",
-      });
+      return res
+        .status(400)
+        .json({ error: "Поля 'title' и 'companyName' обязательны" });
     }
 
     const newVacancy = await Vacancy.create({
       title,
       companyName,
-      description: description || "",
-      location: location || "",
-      employmentType: employmentType || "",
-      workplaceType: workplaceType || "",
-      experienceLevel: experienceLevel || "",
-      skillsRequired: skillsRequired || "",
       salaryFrom: salaryFrom ? Number(salaryFrom) : null,
       salaryTo: salaryTo ? Number(salaryTo) : null,
-      status: status || "Активна",
+      skillsRequired: skillsRequired || "",
+      responses: [],
     });
 
-    res.status(201).json(newVacancy);
+    const doc = newVacancy.toObject();
+    doc.id = doc._id;
+    res.status(201).json(doc);
   } catch (err) {
     next(err);
   }
@@ -89,50 +76,26 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const {
-      title,
-      companyName,
-      description,
-      location,
-      employmentType,
-      workplaceType,
-      experienceLevel,
-      skillsRequired,
-      salaryFrom,
-      salaryTo,
-      status,
-    } = req.body || {};
-
+    const { title, companyName, salaryFrom, salaryTo, skillsRequired } =
+      req.body || {};
     if (!title || !companyName) {
-      return res.status(400).json({
-        error: "Поля 'title' и 'companyName' обязательны при полном обновлении",
-      });
-    }
-
-    const vacancy = await Vacancy.findByPk(id);
-
-    if (!vacancy) {
       return res
-        .status(404)
-        .json({ error: `Вакансия с ID ${id} не найдена для обновления` });
+        .status(400)
+        .json({ error: "Поля 'title' и 'companyName' обязательны" });
     }
 
-    await vacancy.update({
-      title,
-      companyName,
-      description: description || "",
-      location: location || "",
-      employmentType: employmentType || "",
-      workplaceType: workplaceType || "",
-      experienceLevel: experienceLevel || "",
-      skillsRequired: skillsRequired || "",
-      salaryFrom: salaryFrom ? Number(salaryFrom) : null,
-      salaryTo: salaryTo ? Number(salaryTo) : null,
-      status: status || "Активна",
-    });
+    const updatedVacancy = await Vacancy.findByIdAndUpdate(
+      req.params.id,
+      { title, companyName, salaryFrom, salaryTo, skillsRequired },
+      { new: true },
+    );
 
-    res.json(vacancy);
+    if (!updatedVacancy)
+      return res.status(404).json({ error: "Вакансия не найдена" });
+
+    const doc = updatedVacancy.toObject();
+    doc.id = doc._id;
+    res.json(doc);
   } catch (err) {
     next(err);
   }
@@ -140,18 +103,37 @@ router.put("/:id", async (req, res, next) => {
 
 router.delete("/:id", authMiddleware, isAdmin, async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const vacancy = await Vacancy.findByPk(id);
+    const deletedVacancy = await Vacancy.findByIdAndDelete(req.params.id);
+    if (!deletedVacancy)
+      return res.status(404).json({ error: "Вакансия не найдена" });
 
-    if (!vacancy) {
-      return res
-        .status(404)
-        .json({ error: `Вакансия с ID ${id} не найдена для удаления` });
+    res.json({ message: `Вакансия успешно удалена` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/:id/responses", async (req, res, next) => {
+  try {
+    const { candidateName, coverLetter } = req.body;
+    if (!candidateName) {
+      return res.status(400).json({ error: "Имя кандидата обязательно" });
     }
 
-    await vacancy.destroy();
+    const vacancy = await Vacancy.findById(req.params.id);
+    if (!vacancy) return res.status(404).json({ error: "Вакансия не найдена" });
 
-    res.json({ message: `Вакансия с ID ${id} успешно удалена` });
+    vacancy.responses.push({
+      candidateName,
+      coverLetter: coverLetter || "",
+    });
+
+    await vacancy.save();
+
+    res.status(201).json({
+      message: "Отклик успешно добавлен!",
+      responses: vacancy.responses,
+    });
   } catch (err) {
     next(err);
   }

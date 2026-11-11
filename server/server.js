@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const app = express();
 require("dotenv").config();
@@ -9,6 +10,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("Успешное подключение к MongoDB Atlas!"))
+  .catch((err) => console.error("Ошибка подключения к MongoDB:", err));
 
 const authRoutes = require("./routes/auth");
 const authMiddleware = require("./middleware/auth");
